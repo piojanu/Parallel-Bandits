@@ -27,13 +27,13 @@ int main(int argc, char **argv) {
     vector<double> expected_values = {0.5, 0.75, 0.1, 0.1, 0.45, 0.45, 0.45};
     auto bandit = make_bernoulli_bandit(expected_values);
 
-    MedianElimination median_algo(0.01, 0.01);
+    MedianElimination median_algo(0.01, 0.01, (size_t) -1);
     auto begin = steady_clock::now();
     auto median_arm = median_algo.solve(bandit);
     auto end = steady_clock::now();
     auto median_epalsed = duration_cast<milliseconds>(end - begin).count();
 
-    ExpGapElimination exp_gap_algo(0.01, 0.01);
+    ExpGapElimination exp_gap_algo(0.01, 0.01, (size_t) -1);
     begin = steady_clock::now();
     auto exp_gap_arm = exp_gap_algo.solve(bandit);
     end = steady_clock::now();

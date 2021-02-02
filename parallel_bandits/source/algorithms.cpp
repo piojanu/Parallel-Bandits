@@ -8,7 +8,8 @@ using namespace std;
 using namespace bandits;
 
 size_t
-MedianElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit) const
+MedianElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit,
+                         size_t &total_pulls) const
 {
     double epsilon = this->_epsilon / 4;
     double delta = this->_delta / 2;
@@ -20,10 +21,17 @@ MedianElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit) const
     }
     
     while (current_arms.size() > 1) {
-        // Evaluate each arm.
         // TODO(pj): Don't dump pulls from the previous round.
         MedianHeap empirical_values;
         int num_pulls = ceil(1 / pow(epsilon / 2, 2) * log(3 / delta));
+
+        total_pulls += current_arms.size() * num_pulls;
+        if (total_pulls > this->_limit_pulls) {
+            // Halt and return an arbitrary arm;
+            return current_arms[0];
+        }
+
+        // Evaluate each arm.
         for (auto &idx : current_arms) {
             auto &arm = bandit[idx];
             double total_return = 0;
@@ -49,7 +57,8 @@ MedianElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit) const
 }
 
 size_t
-ExpGapElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit) const
+ExpGapElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit,
+                         size_t &total_pulls) const
 {
     int round = 0;
     vector<shared_ptr<IBanditArm>> current_arms;
@@ -66,9 +75,16 @@ ExpGapElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit) const
         double epsilon = pow(2, -round) / 4;
         double delta = this->_delta / (50.0 * pow(round, 3));
 
-        // Evaluate each arm.
         vector<double> empirical_values;
         int num_pulls = ceil(2 / pow(epsilon, 2) * log(2 / delta));
+
+        total_pulls += current_arms.size() * num_pulls;
+        if (total_pulls > this->_limit_pulls) {
+            // Halt and return an arbitrary arm;
+            return current_idxs[0];
+        }
+
+        // Evaluate each arm.
         for (auto &arm : current_arms) {
             double total_return = 0;
             for (int i = 0; i < num_pulls; i++) {
@@ -79,8 +95,8 @@ ExpGapElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit) const
 
         // Find (epsilon_r, delta_r)-optimal arm.
         // TODO(pj): Use pulls (empirical values) from the above eval.
-        MedianElimination med_elim_algo(epsilon / 2, delta);
-        auto best_arm_idx = med_elim_algo.solve(current_arms);
+        MedianElimination med_elim_algo(epsilon / 2, delta, this->_limit_pulls);
+        auto best_arm_idx = med_elim_algo.solve(current_arms, total_pulls);
         auto best_value = empirical_values[best_arm_idx];
 
         // Pick arms above the epsilon-best value.
