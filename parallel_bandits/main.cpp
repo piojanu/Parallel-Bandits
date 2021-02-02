@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <chrono>
 #include <iostream>
 #include <omp.h>
 
@@ -7,6 +8,7 @@
 
 using namespace std;
 using namespace bandits;
+using namespace chrono;
 
 int main(int argc, char **argv) {
     // Seed the random generator.
@@ -24,14 +26,28 @@ int main(int argc, char **argv) {
 
     vector<double> expected_values = {0.5, 0.75, 0.1, 0.1, 0.45, 0.45, 0.45};
     auto bandit = make_bernoulli_bandit(expected_values);
-    MedianElimination algo(0.1, 0.05);
-    auto best_arm = algo.solve(bandit);
 
-    cout << "Bandit arms: ";
+    MedianElimination median_algo(0.01, 0.01);
+    auto begin = steady_clock::now();
+    auto median_arm = median_algo.solve(bandit);
+    auto end = steady_clock::now();
+    auto median_epalsed = duration_cast<milliseconds>(end - begin).count();
+
+    ExpGapElimination exp_gap_algo(0.01, 0.01);
+    begin = steady_clock::now();
+    auto exp_gap_arm = exp_gap_algo.solve(bandit);
+    end = steady_clock::now();
+    auto exp_gap_epalsed = duration_cast<milliseconds>(end - begin).count();
+
+    cout << endl << "Bandit arms: ";
     for (auto &value : expected_values) {
         cout << value << ", ";
     }
-    cout << endl << "Best arm idx: " << best_arm << endl;
+    cout << endl << endl << "Params: epsilon = 0.01, delta = 0.01." << endl;
+    cout << "Median Elimination result arm " << median_arm;
+    cout << " in " << median_epalsed << "[ms]" << endl;
+    cout << "ExpGap Elimination result arm " << exp_gap_arm;
+    cout << " in " << exp_gap_epalsed << "[ms]" << endl;
     
     return 0;
 }

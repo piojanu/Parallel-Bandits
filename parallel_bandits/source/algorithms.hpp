@@ -36,4 +36,14 @@ namespace bandits
         size_t
         solve(const vector<shared_ptr<IBanditArm>> &bandit) const override;
     };
+
+    class ExpGapElimination : public PACAlgorithm
+    {
+    public:
+        ExpGapElimination(double epsilon, double delta) :
+            PACAlgorithm(epsilon, delta) { };
+
+        size_t
+        solve(const vector<shared_ptr<IBanditArm>> &bandit) const override;
+    };
 }
