@@ -23,7 +23,8 @@ namespace bandits
          * Solve the Multi-Armed Bandit problem.
          *
          * @param[in] bandit Vector of bandit arms to pull.
-         * @param[in, out] total_pulls Total number of arm pulls to this moment.
+         * @param[in, out] total_pulls Total number of arm pulls to the present
+         *     moment.
          * @return The (ε-)optimal arm index.
          */
         virtual size_t
@@ -91,5 +92,42 @@ namespace bandits
         size_t
         solve(const vector<shared_ptr<IBanditArm>> &bandit,
               size_t &total_pulls) const override;
+    };
+
+    class OneRoundBestArm : public IAlgorithm
+    {
+    public:
+        /**
+         * Initialize the distributed best-arm solver.
+         *
+         * It identifies the best arm with probability at least 2/3 using
+         * no more than arm pulls per player:
+         *   $$O( 1/\sqrt(k) * \sum_{i=2}^{n} 1/\Delta_i^2 \log(1/\Delta_i) )$$
+         *
+         * See: Hillel, E., Karnin, Z., Koren, T., Lempel, R., and Somekh, O.,
+         *      “Distributed Exploration in Multi-Armed Bandits”, 2013.
+         *
+         * @param num_players Number of OpenMP threads.
+         * @param time_horizon Limit of arm pulls per player.
+         */
+        OneRoundBestArm(int num_players, size_t time_horizon) :
+            _num_players(num_players), _time_horizon(time_horizon) { }
+
+        OneRoundBestArm() = delete;
+
+        size_t
+        solve(const vector<shared_ptr<IBanditArm>> &bandit) const override
+        {
+            size_t total_pulls = 0;
+            return this->solve(bandit, total_pulls);
+        }
+
+        size_t
+        solve(const vector<shared_ptr<IBanditArm>> &bandit,
+              size_t &total_pulls) const override;
+
+    private:
+        const int _num_players;
+        const size_t _time_horizon;
     };
 }

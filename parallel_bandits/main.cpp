@@ -14,8 +14,13 @@ int main(int argc, char **argv) {
     // Seed the random generator.
     srand(static_cast<unsigned int>(time(NULL)));
 
-    #pragma omp parallel
+    int num_agents = 10;
+    vector<pair<double, size_t>> pairs_vector(num_agents);
+    #pragma omp parallel num_threads(num_agents) shared(pairs_vector)
     {
+        auto my_idx = omp_get_thread_num();
+        pairs_vector[my_idx] = make_pair(my_idx, my_idx);
+
         #pragma omp critical
         {
             cout << "Hello World from thread: ";
@@ -23,6 +28,13 @@ int main(int argc, char **argv) {
             cout << "!" << endl;
         }
     }
+
+    cout << endl << "Pairs values: ";
+    for (auto &value : pairs_vector) {
+        cout << value.first << ", " << value.second << "; ";
+    }
+    cout << endl;
+
 
     vector<double> expected_values = {0.5, 0.75, 0.1, 0.1, 0.45, 0.45, 0.45};
     auto bandit = make_bernoulli_bandit(expected_values);

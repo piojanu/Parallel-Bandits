@@ -7,7 +7,7 @@
 using namespace std;
 using namespace bandits;
 
-class PACAlgorithmTest: public ::testing::Test { 
+class MABAlgorithmTest: public ::testing::Test {
 public: 
     void SetUp() { 
         vector<double> expected_values =
@@ -18,7 +18,7 @@ public:
     vector<shared_ptr<IBanditArm>> bandit;
 };
 
-TEST_F(PACAlgorithmTest, GIVENMedianEliminationWHENSolveMABTHENReturnBestArm) {
+TEST_F(MABAlgorithmTest, GIVENMedianEliminationWHENSolveMABTHENReturnBestArm) {
     // Set Up
     MedianElimination algo(0.1, 0.01, (size_t) -1);
 
@@ -29,9 +29,22 @@ TEST_F(PACAlgorithmTest, GIVENMedianEliminationWHENSolveMABTHENReturnBestArm) {
     EXPECT_EQ(arm, 1);
 }
 
-TEST_F(PACAlgorithmTest, GIVENExpGapEliminationWHENSolveMABTHENReturnBestArm) {
+TEST_F(MABAlgorithmTest, GIVENExpGapEliminationWHENSolveMABTHENReturnBestArm) {
     // Set Up
     ExpGapElimination algo(0.1, 0.01, (size_t) -1);
+
+    // Run
+    auto arm = algo.solve(bandit);
+
+    // Test
+    EXPECT_EQ(arm, 1);
+}
+
+TEST_F(MABAlgorithmTest, GIVENOneRoundBestArmWHENSolveMABTHENReturnBestArm) {
+    // Set Up
+    auto num_agents = 5;
+    auto limit_pulls = 8000000;
+    OneRoundBestArm algo(num_agents, limit_pulls);
 
     // Run
     auto arm = algo.solve(bandit);

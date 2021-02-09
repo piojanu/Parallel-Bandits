@@ -1,4 +1,8 @@
+#include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <omp.h>
+#include <random>
 #include <vector>
 
 #include "algorithms.hpp"
@@ -116,4 +120,84 @@ ExpGapElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit,
     }
 
     return current_idxs[0];
+}
+
+size_t
+OneRoundBestArm::solve(const vector<shared_ptr<IBanditArm>> &bandit,
+                       size_t &total_pulls) const
+{
+
+    vector<pair<double, size_t>> empirical_values(this->_num_players);
+    #pragma omp parallel \
+        num_threads(this->_num_players) \
+        shared(bandit, total_pulls, empirical_values)
+    {
+        auto num_pulls = this->_time_horizon / 2;
+
+        // Choose a subset of arms uniformly at random.
+        default_random_engine rnd_gen;
+        vector<size_t> all_idxs(bandit.size());
+        iota(all_idxs.begin(), all_idxs.end(), 0);
+        shuffle(all_idxs.begin(), all_idxs.end(), rnd_gen);
+
+        size_t num_sub_arms =
+            min<size_t>(ceil(6.0 * bandit.size() / sqrt(this->_num_players)),
+                        bandit.size());
+        vector<size_t> sub_idxs(all_idxs.begin(),
+                                all_idxs.begin() + num_sub_arms);
+
+        vector<shared_ptr<IBanditArm>> sub_arms;
+        for (auto &idx : sub_idxs) {
+            sub_arms.push_back(bandit[idx]);
+        }
+
+        // Explore
+        size_t _total_pulls = 0;
+        ExpGapElimination expgap_algo(0, 1.0 / 3.0, num_pulls);
+
+        auto solution_idx = expgap_algo.solve(sub_arms, _total_pulls);
+        auto best_arm_idx = sub_idxs[solution_idx];
+        auto best_arm = sub_arms[solution_idx];
+
+        #pragma omp atomic
+        total_pulls += _total_pulls;
+
+        // Exploit
+        double total_return = 0;
+        for (size_t i = 0; i < num_pulls; i++) {
+            total_return += best_arm->pull();
+        }
+
+        #pragma omp atomic
+        total_pulls += num_pulls;
+
+        // Communicate the best arm idx and value.
+        auto my_idx = omp_get_thread_num();
+        empirical_values[my_idx] =
+            make_pair(total_return / num_pulls, best_arm_idx);
+    }
+
+    vector<double> arms_total(bandit.size(), 0);
+    vector<size_t> arms_count(bandit.size(), 0);
+    for (auto &arm_pair : empirical_values) {
+        auto arm_value = arm_pair.first;
+        auto arm_idx = arm_pair.second;
+
+        arms_total[arm_idx] += arm_value;
+        arms_count[arm_idx] += 1;
+    }
+
+    auto best_arm_idx = bandit.size() - 1;
+    auto best_arm_value = 0.0;
+    for (size_t i = 0; i < bandit.size(); i++) {
+        if (arms_count[i] > sqrt(this->_num_players)) {
+            auto arm_value = arms_total[i] / arms_count[i];
+            if (arm_value > best_arm_value) {
+                best_arm_value = arm_value;
+                best_arm_idx = i;
+            }
+        }
+    }
+
+    return best_arm_idx;
 }
