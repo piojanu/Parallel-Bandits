@@ -40,16 +40,18 @@ int main(int argc, char **argv) {
     auto bandit = make_bernoulli_bandit(expected_values);
 
     MedianElimination median_algo(0.01, 0.01, (size_t) -1);
+    size_t median_total_pulls = 0;
     auto begin = steady_clock::now();
-    auto median_arm = median_algo.solve(bandit);
+    auto median_arm = median_algo.solve(bandit, median_total_pulls);
     auto end = steady_clock::now();
     auto median_epalsed = duration_cast<milliseconds>(end - begin).count();
 
-    ExpGapElimination exp_gap_algo(0.01, 0.01, (size_t) -1);
+    ExpGapElimination expgap_algo(0.01, 0.01, (size_t) -1);
+    size_t expgap_total_pulls = 0;
     begin = steady_clock::now();
-    auto exp_gap_arm = exp_gap_algo.solve(bandit);
+    auto expgap_arm = expgap_algo.solve(bandit, expgap_total_pulls);
     end = steady_clock::now();
-    auto exp_gap_epalsed = duration_cast<milliseconds>(end - begin).count();
+    auto expgap_epalsed = duration_cast<milliseconds>(end - begin).count();
 
     cout << endl << "Bandit arms: ";
     for (auto &value : expected_values) {
@@ -57,9 +59,11 @@ int main(int argc, char **argv) {
     }
     cout << endl << endl << "Params: epsilon = 0.01, delta = 0.01." << endl;
     cout << "Median Elimination result arm " << median_arm;
-    cout << " in " << median_epalsed << "[ms]" << endl;
-    cout << "ExpGap Elimination result arm " << exp_gap_arm;
-    cout << " in " << exp_gap_epalsed << "[ms]" << endl;
+    cout << " in " << median_epalsed << " [ms]";
+    cout << ", " << median_total_pulls << " [pulls]" << endl;
+    cout << "ExpGap Elimination result arm " << expgap_arm;
+    cout << " in " << expgap_epalsed << " [ms]";
+    cout << ", " << expgap_total_pulls << " [pulls]" << endl;
     
     return 0;
 }
