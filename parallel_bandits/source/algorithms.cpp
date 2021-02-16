@@ -60,7 +60,7 @@ size_t
 ExpGapElimination::solve(const vector<shared_ptr<IBanditArm>> &bandit,
                          size_t &total_pulls) const
 {
-    int round = 0;
+    int round = 1;
     vector<shared_ptr<IBanditArm>> current_arms;
     vector<size_t> current_idxs;
 
