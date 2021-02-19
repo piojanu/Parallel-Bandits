@@ -44,6 +44,13 @@ endif()
 find_package(OpenMP REQUIRED)
 
 
+##### IceCream #####
+# Source: https://github.com/renatoGarcia/icecream-cpp
+
+find_package(IcecreamCpp)
+include_directories(${IcecreamCpp_INCLUDE_DIRS})
+
+
 #####
 
 include_directories(source)
