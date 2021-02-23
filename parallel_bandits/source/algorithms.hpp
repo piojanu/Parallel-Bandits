@@ -98,7 +98,7 @@ namespace bandits
     {
     public:
         /**
-         * Initialize the distributed best-arm solver.
+         * Initialize the distributed one-round best-arm solver.
          *
          * It identifies the best arm with probability at least 2/3 using
          * no more than arm pulls per player:
@@ -129,5 +129,36 @@ namespace bandits
     private:
         const int _num_players;
         const size_t _time_horizon;
+    };
+
+    class MultiRoundEpsilonArm : public PACAlgorithm
+    {
+    public:
+        /**
+         * Initialize the distributed multi-round ε-arm solver.
+         *
+         * See: Hillel, E., Karnin, Z., Koren, T., Lempel, R., and Somekh, O.,
+         *      “Distributed Exploration in Multi-Armed Bandits”, 2013.
+         *
+         * @param num_players Number of OpenMP threads.
+         * @param epsilon Find an arm that is at most ε worse than the optimal
+         *     arm in terms of the expected value (bounded between [0, 1]).
+         * @param delta With probability of at least 1-δ find an ε-optimal arm.
+         * @param limit_pulls Don't pull all arms more then this amount.
+         *     If the limit is exceeded, then `solve` returns an arbitrary arm!
+         */
+        MultiRoundEpsilonArm(int num_players, double epsilon, double delta,
+                             size_t limit_pulls) :
+            PACAlgorithm(epsilon, delta, limit_pulls),
+            _num_players(num_players) { }
+        
+        using PACAlgorithm::solve; // Use the base class implementation;
+
+        size_t
+        solve(const vector<shared_ptr<IBanditArm>> &bandit,
+              size_t &total_pulls) const override;
+
+    private:
+        const int _num_players;
     };
 }

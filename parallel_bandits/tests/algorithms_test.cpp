@@ -52,3 +52,15 @@ TEST_F(MABAlgorithmTest, GIVENOneRoundBestArmWHENSolveMABTHENReturnBestArm) {
     // Test
     EXPECT_EQ(arm, 1);
 }
+
+TEST_F(MABAlgorithmTest, GIVENMultiRoundEpsArmWHENSolveMABTHENReturnBestArm) {
+    // Set Up
+    auto num_agents = 5;
+    MultiRoundEpsilonArm algo(num_agents, 0.1, 0.01, (size_t) -1);
+
+    // Run
+    auto arm = algo.solve(bandit);
+
+    // Test
+    EXPECT_EQ(arm, 1);
+}

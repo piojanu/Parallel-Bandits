@@ -201,3 +201,76 @@ OneRoundBestArm::solve(const vector<shared_ptr<IBanditArm>> &bandit,
 
     return best_arm_idx;
 }
+
+size_t
+MultiRoundEpsilonArm::solve(const vector<shared_ptr<IBanditArm>> &bandit,
+                       size_t &total_pulls) const
+{
+    int round = 1;
+    double epsilon = 1, time = 0;
+
+    vector<size_t> current_idxs(bandit.size());
+    iota(current_idxs.begin(), current_idxs.end(), 0);
+
+    // 2D vector of the shape: num. players x num. arms.
+    vector<vector<double>> empirical_values(this->_num_players,
+                                            vector<double>(bandit.size(), 0));
+    
+    while (current_idxs.size() > 1 && epsilon > (this->_epsilon / 2)) {
+        auto time_old = time;
+        epsilon = pow(2, -round);
+        time = (2 / (this->_num_players * pow(epsilon, 2))) *
+            log((4 * bandit.size() * pow(round, 2)) / this->_delta);
+        auto num_pulls = ceil(time - time_old);
+
+        total_pulls += this->_num_players * current_idxs.size() * num_pulls;
+        if (total_pulls > this->_limit_pulls) {
+            // Halt and return an arbitrary arm;
+            return current_idxs[0];
+        }
+
+        #pragma omp parallel \
+            num_threads(this->_num_players) \
+            firstprivate(bandit, current_idxs, num_pulls) \
+            shared(empirical_values)
+        {
+            auto my_idx = omp_get_thread_num();
+            for (auto &arm_idx : current_idxs) {
+                auto &arm = bandit[arm_idx];
+
+                double total_return = 0;
+                for (auto i = 0; i < num_pulls; i++) {
+                    total_return += arm->pull();
+                }
+
+                auto average_return = total_return / num_pulls;
+                empirical_values[my_idx][arm_idx] +=
+                    (average_return - empirical_values[my_idx][arm_idx]) /
+                    round;
+            }
+        }
+
+        vector<double> average_values(bandit.size(), 0);
+        for (auto &arm_idx : current_idxs) {
+            for (auto p_idx = 0; p_idx < this->_num_players; p_idx++) {
+                average_values[arm_idx] += empirical_values[p_idx][arm_idx];
+            }
+            average_values[arm_idx] /= this->_num_players;
+        }
+        auto best_value = *max_element(average_values.begin(),
+                                       average_values.end());
+        
+        vector<size_t> subset_idxs;
+        for (auto &arm_idx : current_idxs) {
+            if (average_values[arm_idx] >= (best_value - epsilon)) {
+                subset_idxs.push_back(arm_idx);
+            }
+        }
+        
+        // Bookkeeping.
+        round += 1;
+        swap(current_idxs, subset_idxs);
+    }
+    
+    return current_idxs[0];
+}
