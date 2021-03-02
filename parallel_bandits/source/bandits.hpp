@@ -25,4 +25,7 @@ namespace bandits
 
     vector<shared_ptr<IBanditArm>>
     make_bernoulli_bandit(const vector<double> &expected_values);
+
+    vector<shared_ptr<IBanditArm>>
+    make_bernoulli_bandit(const int num_arms, const double min_gap);
 }

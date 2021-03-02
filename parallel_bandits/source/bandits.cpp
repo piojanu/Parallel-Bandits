@@ -22,3 +22,20 @@ bandits::make_bernoulli_bandit(const vector<double> &expected_values)
 
     return bandit;
 }
+
+vector<shared_ptr<IBanditArm>>
+bandits::make_bernoulli_bandit(const int num_arms, const double min_gap)
+{
+    double optimal_value = 1 - ((1 - min_gap) / 2);
+    double others_value = (1 - min_gap) / 2;
+
+    vector<shared_ptr<IBanditArm>> bandit;
+    for (auto i = 0; i < (num_arms - 1); i++) {
+        auto arm = make_shared<BernoulliArm>(others_value);
+        bandit.push_back(arm);
+    }
+    auto arm = make_shared<BernoulliArm>(optimal_value);
+    bandit.push_back(arm);
+
+    return bandit;
+}

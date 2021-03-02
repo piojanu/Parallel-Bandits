@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <chrono>
 #include <iostream>
+#include <fstream>
 #include <omp.h>
 
 #include "algorithms.hpp"
@@ -10,17 +11,60 @@ using namespace std;
 using namespace bandits;
 using namespace chrono;
 
+struct Result {
+    milliseconds elapsed;
+    size_t total_pulls;
+    bool is_solved;
+};
+
+Result measure_expgap(int num_arms, double min_gap,
+                      double epsilon, double delta)
+{
+    auto bandit = make_bernoulli_bandit(num_arms, min_gap);
+    ExpGapElimination expgap_algo(epsilon, delta, (size_t) -1);
+    size_t total_pulls = 0;
+
+    auto begin = steady_clock::now();
+    auto solution_arm = expgap_algo.solve(bandit, total_pulls);
+    auto end = steady_clock::now();
+
+    Result result = {
+        duration_cast<milliseconds>(end - begin),
+        total_pulls,
+        solution_arm == (num_arms - 1)
+    };
+
+    return result;
+}
+
+Result measure_multiround(int num_arms, double min_gap, int num_threads,
+                          double epsilon, double delta)
+{
+    auto bandit = make_bernoulli_bandit(num_arms, min_gap);
+    MultiRoundEpsilonArm multiround_algo(num_threads, epsilon, delta,
+                                         (size_t) -1);
+    size_t total_pulls = 0;
+
+    auto begin = steady_clock::now();
+    auto solution_arm = multiround_algo.solve(bandit, total_pulls);
+    auto end = steady_clock::now();
+
+    Result result = {
+        duration_cast<milliseconds>(end - begin),
+        total_pulls,
+        solution_arm == (num_arms - 1)
+    };
+
+    return result;
+}
+
 int main(int argc, char **argv) {
     // Seed the random generator.
     srand(static_cast<unsigned int>(time(NULL)));
 
-    int num_agents = 10;
-    vector<pair<double, size_t>> pairs_vector(num_agents);
-    #pragma omp parallel num_threads(num_agents) shared(pairs_vector)
+    #pragma omp parallel num_threads(10)
     {
         auto my_idx = omp_get_thread_num();
-        pairs_vector[my_idx] = make_pair(my_idx, my_idx);
-
         #pragma omp critical
         {
             cout << "Hello World from thread: ";
@@ -28,42 +72,68 @@ int main(int argc, char **argv) {
             cout << "!" << endl;
         }
     }
-
-    cout << endl << "Pairs values: ";
-    for (auto &value : pairs_vector) {
-        cout << value.first << ", " << value.second << "; ";
-    }
     cout << endl;
 
+    vector<int> num_arms_params = {100, 1000, 10000, 100000, 1000000};
+    vector<double> min_gap_params = {0.4, 0.2, 0.1, 0.01, 0.001};
+    vector<int> num_threads_params = {1, 8, 16, 32, 64, 128};
+    vector<double> epsilon_params = {0.2, 0.1, 0.01, 0.001};
+    vector<double> delta_params = {0.1, 0.05, 0.01};
+    const auto total_runs = (num_arms_params.size() *
+                             min_gap_params.size() *
+                             num_threads_params.size() *
+                             epsilon_params.size() *
+                             delta_params.size());
+    int run_count = 0;
 
-    vector<double> expected_values = {0.5, 0.75, 0.1, 0.1, 0.45, 0.45, 0.45};
-    auto bandit = make_bernoulli_bandit(expected_values);
+    ofstream expgap_results;
+    expgap_results.open("expgap_results.csv", fstream::out);
+    expgap_results << "num_arms,min_gap,num_threads,epsilon,delta"
+                   << ",elapsed,pulls,solved" << endl;
 
-    MedianElimination median_algo(0.01, 0.01, (size_t) -1);
-    size_t median_total_pulls = 0;
+    ofstream multiround_results;
+    multiround_results.open("multiround_results.csv", fstream::out);
+    multiround_results << "num_arms,min_gap,num_threads,epsilon,delta"
+                       << ",elapsed,pulls,solved" << endl;
+
     auto begin = steady_clock::now();
-    auto median_arm = median_algo.solve(bandit, median_total_pulls);
-    auto end = steady_clock::now();
-    auto median_epalsed = duration_cast<milliseconds>(end - begin).count();
+    for (auto &num_arms : num_arms_params) {
+    for (auto &min_gap : min_gap_params) {
+    for (auto &epsilon : epsilon_params) {
+    for (auto &delta : delta_params) {
+        auto result = measure_expgap(num_arms, min_gap, epsilon, delta);
+        expgap_results << num_arms << ","
+                       << min_gap << ","
+                       << 1 << "," // Num. threads
+                       << epsilon << ","
+                       << delta << ","
+                       << result.elapsed.count() << ","
+                       << result.total_pulls << ","
+                       << result.is_solved << endl;
 
-    ExpGapElimination expgap_algo(0.01, 0.01, (size_t) -1);
-    size_t expgap_total_pulls = 0;
-    begin = steady_clock::now();
-    auto expgap_arm = expgap_algo.solve(bandit, expgap_total_pulls);
-    end = steady_clock::now();
-    auto expgap_epalsed = duration_cast<milliseconds>(end - begin).count();
+        for (auto &num_threads : num_threads_params) {
+            auto result = measure_multiround(num_arms, min_gap, num_threads,
+                                             epsilon, delta);
+            multiround_results << num_arms << ","
+                               << min_gap << ","
+                               << num_threads << ","
+                               << epsilon << ","
+                               << delta << ","
+                               << result.elapsed.count() << ","
+                               << result.total_pulls << ","
+                               << result.is_solved << endl;
+        }
 
-    cout << endl << "Bandit arms: ";
-    for (auto &value : expected_values) {
-        cout << value << ", ";
-    }
-    cout << endl << endl << "Params: epsilon = 0.01, delta = 0.01." << endl;
-    cout << "Median Elimination result arm " << median_arm;
-    cout << " in " << median_epalsed << " [ms]";
-    cout << ", " << median_total_pulls << " [pulls]" << endl;
-    cout << "ExpGap Elimination result arm " << expgap_arm;
-    cout << " in " << expgap_epalsed << " [ms]";
-    cout << ", " << expgap_total_pulls << " [pulls]" << endl;
+        expgap_results.flush();
+        multiround_results.flush();
+
+        auto total_time = duration_cast<seconds>(steady_clock::now() - begin);
+        run_count++;
+        cout << "Elapsed: " << total_time.count() << "s | "
+             << "Run: " << run_count << "/" << total_runs << endl;
+    }}}}
     
+    expgap_results.close();
+    multiround_results.close();
     return 0;
 }
